@@ -4,11 +4,9 @@ import config from './model/config.js';
 import cors from 'cors';
 import Userroutes from "./routes/Userroutes.js"
 import Authroutes from "./routes/Authroutes.js"
-import Previoustaskroutes from './routes/previoustaskroutes.js';
-import Completedtasksroutes from './routes/Completedtaskroutes.js';
-import Currenttaskroutes from './routes/Currenttaskroutes.js';
-import Nexttaskroutes from './routes/Nexttaskroutes.js'
-import Pendingtaskroutes from './routes/Pendingtaskroutes.js'
+import CandidateUploadRoute from './routes/CandidateRoute.js';
+
+
 
 const app = express();
 
@@ -23,18 +21,16 @@ app.use(cors());
 // passing Auth
 
 Userroutes(app)
-Taskroutes(app)
+
 Authroutes(app)
-Previoustaskroutes(app)
-Completedtasksroutes(app)
-Currenttaskroutes(app)
-Nexttaskroutes(app)
-Pendingtaskroutes(app)
+
+CandidateUploadRoute(app)
+
 // Setup JWT
 // Assuming you want to use JWT for authentication
 // Import the necessary JWT package
 import jwt from 'jsonwebtoken';
-import Taskroutes from './routes/Taskroutes.js';
+
 
 // Define a JWT authentication middleware
 const authenticateJWT = (req, res, next) => {
@@ -54,15 +50,10 @@ const authenticateJWT = (req, res, next) => {
   });
 };
 
-// Apply the JWT authentication middleware to relevant routes
-// Drinkroutes(app, authenticateJWT);
-// Customersroutes(app, authenticateJWT);
-// Roomsroutes(app, authenticateJWT);
-// Menuroutes(app, authenticateJWT);
-//  Authroutes(app, authenticateJWT);
+
 
 app.get('/', (req, res) => {
-  res.send("Hello😁 Welcome to the my Task api");
+  res.send("Hello😁 Welcome to the my voters api");
 });
 
 app.listen(config.port || 5000, () => {

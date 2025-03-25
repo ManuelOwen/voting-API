@@ -12,28 +12,28 @@ import jwt from 'jsonwebtoken';
 // };
 // TO REGISTER USER
 export const register = async (req, res) => {
-  const { username, userpassword, useremail, userid } = req.body;
+  const { username, password, email, id } = req.body;
   const saltRounds = 10;
 
   // Check if required fields are provided
   if (!username)  {
     return res.status(400).json({ error: 'username required' });
-  }if(!userpassword){
-    return res.status(400).json({error:'userpassword required'});
-  }if(!useremail){
-    return res.status(400).json({error:'user email required'})
+  }if(!password){
+    return res.status(400).json({error:'password required'});
+  }if(!email){
+    return res.status(400).json({error:' email required'})
   }
 //register user
   try {
-    const hashedPassword = await bcrypt.hash(userpassword, saltRounds);
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
     const pool = await sql.connect(config.sql);
 
     const result = await pool
       .request()
       .input('username', sql.VarChar, username)
-      .input('useremail', sql.VarChar, useremail)
-      .input('userpassword', sql.VarChar, hashedPassword)
-      .query('SELECT * FROM users WHERE username = @username OR useremail = @useremail OR userpassword=@userpassword');
+      .input('email', sql.VarChar, email)
+      .input('password', sql.VarChar, hashedPassword)
+      .query('SELECT * FROM users WHERE username = @username OR email = @email OR password=@password');
 
     const user = result.recordset[0];
 
@@ -44,26 +44,27 @@ export const register = async (req, res) => {
     await pool
       .request()
       .input('username', sql.VarChar, username)
-      .input('userid', sql.VarChar, userid)
-      .input('useremail', sql.VarChar, useremail)
-      .input('userpassword', sql.VarChar, hashedPassword)
-      .query('INSERT INTO users (username, userid, useremail, userpassword) VALUES (@username, @userid, @useremail, @userpassword)');
+      .input('id', sql.VarChar, id)
+      .input('email', sql.VarChar, email)
+      .input('password', sql.VarChar, hashedPassword)
+      .query('INSERT INTO users (username, id, email, password) VALUES (@username, @id, @email, @password)');
 
     res.status(200).json({ message: 'Registration successful' });
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: 'Error occurred while creating user' });
+    console.log(error)
   } finally {
     await sql.close();
   }
 };
 //login user
 export const login = async (req, res) => {
-  const { username, userpassword } = req.body;
+  const { username, password } = req.body;
 
   // Check if required fields are provided
-  if (!username || !userpassword) {
-    return res.status(400).json({ error: 'username and userpassword are required' });
+  if (!username || !password) {
+    return res.status(400).json({ error: 'username and password are required' });
   }
 
   try {
@@ -72,8 +73,8 @@ export const login = async (req, res) => {
     const result = await pool
       .request()
       .input('Username', sql.VarChar, username)
-      .input('userpassword', sql.VarChar, userpassword)
-      .query('SELECT * FROM users WHERE Username = @Username OR userpassword=@userpassword');
+      .input('password', sql.VarChar, password)
+      .query('SELECT * FROM users WHERE Username = @Username OR password=@password');
 
     if (result.recordset.length === 0) {
       return res.status(401).json({ error: 'Authentication failed. Wrong name or password' });
@@ -81,21 +82,21 @@ export const login = async (req, res) => {
 
     const user = result.recordset[0];
 
-    if (!bcrypt.compareSync(userpassword, user.userpassword)) {
+    if (!bcrypt.compareSync(password, user.password)) {
       return res.status(401).json({ error: 'Authorization failed. Wrong credentials' });
     }
 
     const token = jwt.sign(
-      { username: user.username, useremail: user.useremail, userpassword: user.userpassword },
+      { username: user.username, email: user.email, password: user.password },
       config.jwt_secret,
       { expiresIn: '1h' }
     );
 
     res.status(200).json({
       message: 'Login successful',
-      useremail: user.useremail,
+      email: user.email,
       username: user.username,
-      userpassword: user.userpassword,
+      password: user.password,
       token: token
     });
   } catch (error) {

@@ -25,8 +25,8 @@ export const getuser = async (req, res) => {
         const { id } = req.params;
         let pool = await sql.connect(config.sql);
         const result = await pool.request()
-            .input("userid", sql.Int, id)
-            .query("select * from users where userid = @userid");
+            .input("id", sql.Int, id)
+            .query("select * from users where id = @id");
         !result.recordset[0] ? res.status(404).json({ message: 'user not found' }) :
             res.status(200).json(result.recordset);
     } catch (error) {
@@ -44,11 +44,12 @@ export const createusers = async (req, res) => {
         let pool = await sql.connect(config.sql);
         let insertuser = await pool.request()
             .input("description", sql.VarChar, description) // Insert the description into the SQL query
-            .query("INSERT INTO users (description) values (@description)"); // Execute the SQL query
+           await sql.query`INSERT INTO users (email, username,password ) VALUES (${email}, ${username},${password} )`; // Execute the SQL query
         res.status(201).json({ message: 'user created successfully' });
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'An error occurred while creating user' });
+        console.log(error)
     } finally {
         sql.close();   // Close the SQL connection
     }
@@ -63,24 +64,24 @@ export const createusers = async (req, res) => {
 export const updateuser = async (req, res) => {
     try {
         const { id } = req.params; // Assuming 'id' is the parameter for the user ID
-        const { userid, username, useremail, userpassword } = req.body; // Extracting the values from req.body
+        const {  username, email, password } = req.body; // Extracting the values from req.body
 
         // Ensure that the 'password' field is defined and not empty in req.body
-        if (!userpassword) {
+        if (!password) {
             return res.status(400).json({ error: 'Password is required' });
         }
 
         // Generate hashed password
         const saltRounds = 10;
-        const hashedPassword = await bcrypt.hash(userpassword, saltRounds);
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
 
         let pool = await sql.connect(config.sql);
         await pool.request()
-            .input('userid', sql.VarChar, userid)
+            .input('id', sql.VarChar, id)
             .input('username', sql.VarChar, username)
-            .input('useremail', sql.VarChar, useremail)
-            .input('userpassword', sql.VarChar, hashedPassword)
-            .query('SELECT * FROM users WHERE username = @username OR useremail = @useremail OR userpassword=@userpassword OR userid=@userid');
+            .input('email', sql.VarChar, email)
+            .input('password', sql.VarChar, hashedPassword)
+            .query('SELECT * FROM users WHERE username = @username OR email = @email OR password=@password OR id=@id');
 
         res.status(200).json({ message: 'user updated successfully' });
     } catch (error) {
@@ -99,7 +100,7 @@ export const deleteuser = async (req, res) => {
     try {
         const { id } = req.params;
         await sql.connect(config.sql);
-        await sql.query`DELETE FROM users WHERE userid = ${id}`;
+        await sql.query`DELETE FROM users WHERE id = ${id}`;
         res.status(200).json({ message: 'user deleted successfully' });
     } catch (error) {
         console.log(error)

@@ -14,10 +14,10 @@ const config = {
     port: PORT,
     jwt_secret: JWT_SECRET,
     sql: {
-        server: 'mannu.database.windows.net',
-        database:'Tmanager',
-        user: 'emmanuel',
-        password: SQL_PWD,
+        server: 'localhost',
+        database:'voting',
+        user: 'root',
+        password: '',
         options: {
             encrypt: true,
         trustservercertificate:false,
