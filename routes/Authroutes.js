@@ -2,13 +2,13 @@ import express from 'express';
 import { register, login } from '../Controllers/Authcontroller.js';
 
 // REGISTER NEW USER
-const Authroutes = () => {
-  const router = express.Router();
 
-  router.post('/register', register);
-  router.post('/login', login);
+  const Authroutes = express.Router();
 
-  return router;
-};
+  Authroutes.post('/register', register);
+  Authroutes.post('/login', login);
+
+  
+
 
 export default Authroutes;

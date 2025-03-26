@@ -6,7 +6,7 @@ import Userroutes from "./routes/Userroutes.js";
 import Authroutes from "./routes/Authroutes.js";
 import CandidateUploadRoute from './routes/CandidateRoute.js';
 import jwt from 'jsonwebtoken';
-
+import sql from 'mysql2';
 
 const app = express();
 
@@ -25,8 +25,13 @@ app.use('/candidates', CandidateUploadRoute);
 app.get('/', (req, res) => {
   res.send("Hello😁 Welcome to my voters API");
 });
+const pool = await sql.connect(config.sql);
 
 const PORT = config.port || 5000;
-app.listen(PORT, () => {
-  console.log("Server is running on port", PORT);
-});
+if(pool){
+  app.listen(PORT, () => {
+
+    console.log("Server is running on port", PORT);
+
+  })
+};

@@ -1,99 +1,107 @@
-import sql from 'mssql';
+import sql from 'mysql2/promise'; // Use mysql2 with promises
 import config from '../model/config.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
-
 // TO REGISTER USER
+
+
+
 export const register = async (req, res) => {
-  const { username, password, email, id } = req.body;
+  const { username, password, email } = req.body;
   const saltRounds = 10;
 
-  // Check if required fields are provided
-  if (!username)  {
-    return res.status(400).json({ error: 'username required' });
-  }if(!password){
-    return res.status(400).json({error:'password required'});
-  }if(!email){
-    return res.status(400).json({error:' email required'})
-  }
-//register user
+  // Validate required fields
+  if (!username) return res.status(400).json({ error: 'Username required' });
+  if (!password) return res.status(400).json({ error: 'Password required' });
+  if (!email) return res.status(400).json({ error: 'Email required' });
+ 
   try {
     const hashedPassword = await bcrypt.hash(password, saltRounds);
-    const pool = await sql.connect(config.sql);
+    const pool = await sql.createConnection(config.sql);
 
-    const result = await pool
-      .request()
-      .input('username', sql.VarChar, username)
-      .input('email', sql.VarChar, email)
-      .input('password', sql.VarChar, hashedPassword)
-      .query('SELECT * FROM users WHERE username = @username OR email = @email OR password=@password');
+    // Debugging Log (Remove in production)
+    console.log("Registering User:", { username, email, hashedPassword });
 
-    const user = result.recordset[0];
+    // Check if user already exists
+    const [existingUsers] = await pool.execute(
+      'SELECT * FROM users WHERE username = ? AND email = ?',
+      [username, email]
+    );
 
-    if (user) {
+    if (existingUsers.length > 0) {
       return res.status(409).json({ error: 'User already exists' });
     }
 
-    await pool
-      .request()
-      .input('username', sql.VarChar, username)
-      .input('id', sql.VarChar, id)
-      .input('email', sql.VarChar, email)
-      .input('password', sql.VarChar, hashedPassword)
-      .query('INSERT INTO users (username, id, email, password) VALUES (@username, @id, @email, @password)');
+    // Insert new user
+    await pool.execute(
+      'INSERT INTO users (username,  email, password) VALUES ( ?, ?, ?)',
+      [username, email, hashedPassword]
+    );
 
-    res.status(200).json({ message: 'Registration successful' });
+    res.status(201).json({ message: 'Registration successful' });
   } catch (error) {
-    console.log(error);
+    console.error('Error during registration:', error);
     res.status(500).json({ error: 'Error occurred while creating user' });
-    console.log(error)
-  } finally {
-    await sql.close();
+    console.log(error);
   }
 };
-//login user
-export const login = async (req, res) => {
-  const { email, password } = req.body; // Fix: Ensure we're using 'email' instead of 'username'
 
-  // Check if required fields are provided
+
+// LOGIN USER
+export const login = async (req, res) => {
+  const { email, password } = req.body;
+
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
   try {
-    const pool = await sql.connect(config.sql);
+    const pool = await sql.createConnection(config.sql);
 
-    // Fix: Correct query to search by email only
-    const result = await pool
-      .request()
-      .input('email', sql.VarChar, email)
-      .query('SELECT * FROM users WHERE email = @email');
+    // Retrieve user by email
+    const [rows] = await pool.execute(
+      'SELECT * FROM users WHERE email = ?',
+      [email]
+    );
 
-    if (result.recordset.length === 0) {
+    console.log("User rows retrieved from DB:", rows);
+
+    if (!rows || rows.length === 0) {
       return res.status(401).json({ error: 'Authentication failed. Invalid email or password' });
     }
 
-    const user = result.recordset[0];
+    const user = rows[0];
+    console.log("Retrieved user:", user);
 
-    // Fix: Compare hashed password using bcrypt
-    const isMatch = await bcrypt.compare(password, user.password);
+    const storedHashedPassword = Buffer.isBuffer(user.password) 
+      ? user.password.toString('utf-8') 
+      : user.password;
+
+    console.log("Stored password from DB:", storedHashedPassword);
+    console.log("Entered password:", password);
+
+    const isMatch = await bcrypt.compare(password, storedHashedPassword);
+    console.log("Password match result:", isMatch);
+
     if (!isMatch) {
-      return res.status(401).json({ error: 'Authorization failed. Invalid credentials' });
+      return res.status(401).json({ error: 'Authentication failed. Invalid email or password' });
     }
 
-    // Fix: Only store necessary user data in token (excluding password)
     const token = jwt.sign(
-      { username: user.username, email: user.email },
+      { id: user.id, username: user.username, email: user.email },
       config.jwt_secret,
       { expiresIn: '1h' }
     );
 
     res.status(200).json({
       message: 'Login successful',
-      email: user.email,
-      username: user.username,
-      token: token
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email
+      }
     });
 
   } catch (error) {
@@ -101,5 +109,3 @@ export const login = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
-
-
