@@ -1,111 +1,104 @@
-import sql from 'mssql';
+import mysql from 'mysql2/promise';
 import bcrypt from 'bcrypt';
-import config from '../model/config.js'
+import config from '../model/config.js';
 
+// Create MySQL connection pool
+const pool = mysql.createPool(config.sql);
 
-
+// Get all users
 export const getusers = async (req, res) => {
     try {
-        // console.log("running")
-        console.log(config)
-        const pool = await sql.connect(config.sql);
-        const result = await pool.request().query("select * from users");
-        !result.recordset[0] ? res.status(404).json({ message: 'users not found' }) :
-        res.status(200).json(result.recordset);
+        const [rows] = await pool.query("SELECT * FROM users");
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'No users found' });
+        }
+
+        res.status(200).json(rows);
     } catch (error) {
-        res.status(201).json({ error: error });
-    } finally {
-        sql.close(); // Close the SQL connection
+        console.error("Database Error:", error);
+        res.status(500).json({ error: "Internal Server Error", details: error.message });
+        console.log(error);
     }
 };
 
-// // Get a single user
+// Get a single user by ID
 export const getuser = async (req, res) => {
     try {
         const { id } = req.params;
-        let pool = await sql.connect(config.sql);
-        const result = await pool.request()
-            .input("id", sql.Int, id)
-            .query("select * from users where id = @id");
-        !result.recordset[0] ? res.status(404).json({ message: 'user not found' }) :
-            res.status(200).json(result.recordset);
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: 'An error occurred while retrieving users' });
-    } finally {
-        sql.close();
-    }
-};
+        const [rows] = await pool.query("SELECT * FROM users WHERE id = ?", [id]);
 
-// // Create a new user
-export const createusers = async (req, res) => {
-    try {
-        const { description } = req.body;
-        let pool = await sql.connect(config.sql);
-        let insertuser = await pool.request()
-            .input("description", sql.VarChar, description) // Insert the description into the SQL query
-           await sql.query`INSERT INTO users (email, username,password ) VALUES (${email}, ${username},${password} )`; // Execute the SQL query
-        res.status(201).json({ message: 'user created successfully' });
-    } catch (error) {
-        console.log(error)
-        res.status(500).json({ error: 'An error occurred while creating user' });
-        console.log(error)
-    } finally {
-        sql.close();   // Close the SQL connection
-    }
-};
-// // Update a user
-
-
-
-
-
-
-export const updateuser = async (req, res) => {
-    try {
-        const { id } = req.params; // Assuming 'id' is the parameter for the user ID
-        const {  username, email, password } = req.body; // Extracting the values from req.body
-
-        // Ensure that the 'password' field is defined and not empty in req.body
-        if (!password) {
-            return res.status(400).json({ error: 'Password is required' });
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
         }
 
-        // Generate hashed password
-        const saltRounds = 10;
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-        let pool = await sql.connect(config.sql);
-        await pool.request()
-            .input('id', sql.VarChar, id)
-            .input('username', sql.VarChar, username)
-            .input('email', sql.VarChar, email)
-            .input('password', sql.VarChar, hashedPassword)
-            .query('SELECT * FROM users WHERE username = @username OR email = @email OR password=@password OR id=@id');
-
-        res.status(200).json({ message: 'user updated successfully' });
+        res.status(200).json(rows[0]);
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: 'An error occurred while updating user' });
-    } finally {
-        sql.close();
+        console.error("Error retrieving user:", error);
+        res.status(500).json({ error: 'An error occurred while retrieving user', details: error.message });
     }
-}
+};
 
+// Create a new user with a default role
+export const createusers = async (req, res) => {
+    try {
+        const { email, username, password, role = "user" } = req.body;  // Default role = "user"
+        
+        if (!email || !username || !password) {
+            return res.status(400).json({ error: "Email, Username, and Password are required" });
+        }
 
+        const hashedPassword = await bcrypt.hash(password, 10);
+        await pool.query("INSERT INTO users (email, username, password, role) VALUES (?, ?, ?, ?)", 
+                         [email, username, hashedPassword, role]);
 
+        res.status(201).json({ message: 'User created successfully', role });
+    } catch (error) {
+        console.error("Error creating user:", error);
+        res.status(500).json({ error: 'An error occurred while creating user', details: error.message });
+    }
+};
 
-// // Delete a user
+// Update a user
+export const updateuser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { username, email, password, role } = req.body;
+
+        if (!username || !email || !password || !role) {
+            return res.status(400).json({ error: "Username, Email, Password, and Role are required" });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const [result] = await pool.query(
+            "UPDATE users SET username = ?, email = ?, password = ?, role = ? WHERE id = ?",
+            [username, email, hashedPassword, role, id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.status(200).json({ message: 'User updated successfully' });
+    } catch (error) {
+        console.error("Error updating user:", error);
+        res.status(500).json({ error: 'An error occurred while updating user', details: error.message });
+    }
+};
+
+// Delete a user
 export const deleteuser = async (req, res) => {
     try {
         const { id } = req.params;
-        await sql.connect(config.sql);
-        await sql.query`DELETE FROM users WHERE id = ${id}`;
-        res.status(200).json({ message: 'user deleted successfully' });
+        const [result] = await pool.query("DELETE FROM users WHERE id = ?", [id]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.status(200).json({ message: 'User deleted successfully' });
     } catch (error) {
-        console.log(error)
-        res.status(500).json({ error: 'An error occurred while deleting the user' });
-    } finally {
-        sql.close();
+        console.error("Error deleting user:", error);
+        res.status(500).json({ error: 'An error occurred while deleting the user', details: error.message });
     }
 };

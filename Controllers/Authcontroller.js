@@ -3,13 +3,7 @@ import config from '../model/config.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
-// export const loginRequired = (req, res, next) => {
-//   if (req.user) {
-//     next();
-//   } else {
-//     return res.status(401).json({ message: 'Unauthorized user!' });
-//   }
-// };
+
 // TO REGISTER USER
 export const register = async (req, res) => {
   const { username, password, email, id } = req.body;
@@ -60,34 +54,37 @@ export const register = async (req, res) => {
 };
 //login user
 export const login = async (req, res) => {
-  const { username, password } = req.body;
+  const { email, password } = req.body; // Fix: Ensure we're using 'email' instead of 'username'
 
   // Check if required fields are provided
-  if (!username || !password) {
-    return res.status(400).json({ error: 'username and password are required' });
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
   }
 
   try {
     const pool = await sql.connect(config.sql);
 
+    // Fix: Correct query to search by email only
     const result = await pool
       .request()
-      .input('Username', sql.VarChar, username)
-      .input('password', sql.VarChar, password)
-      .query('SELECT * FROM users WHERE Username = @Username OR password=@password');
+      .input('email', sql.VarChar, email)
+      .query('SELECT * FROM users WHERE email = @email');
 
     if (result.recordset.length === 0) {
-      return res.status(401).json({ error: 'Authentication failed. Wrong name or password' });
+      return res.status(401).json({ error: 'Authentication failed. Invalid email or password' });
     }
 
     const user = result.recordset[0];
 
-    if (!bcrypt.compareSync(password, user.password)) {
-      return res.status(401).json({ error: 'Authorization failed. Wrong credentials' });
+    // Fix: Compare hashed password using bcrypt
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Authorization failed. Invalid credentials' });
     }
 
+    // Fix: Only store necessary user data in token (excluding password)
     const token = jwt.sign(
-      { username: user.username, email: user.email, password: user.password },
+      { username: user.username, email: user.email },
       config.jwt_secret,
       { expiresIn: '1h' }
     );
@@ -96,15 +93,13 @@ export const login = async (req, res) => {
       message: 'Login successful',
       email: user.email,
       username: user.username,
-      password: user.password,
       token: token
     });
+
   } catch (error) {
     console.error('Error during login:', error);
-    console.log('error')
     res.status(500).json({ error: 'Internal server error' });
-  } finally {
-    await sql.close();
   }
 };
+
 

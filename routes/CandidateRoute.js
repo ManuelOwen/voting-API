@@ -1,20 +1,12 @@
-// import Taskroutes.js from 'server.js'
-import { getCandidates, getCandidate,   deleteCandidate,updateCandidate,createCandidate } from '../Controllers/candidateUploadBody.js';
-import { login, register } from '../Controllers/Authcontroller.js';
+import express from 'express';
+import { getCandidates, getCandidate, createCandidate, updateCandidate, deleteCandidate } from '../controllers/candidateUploadBody.js';
 
+const router = express.Router();
 
-const CandidateUploadRoute = (app) => {
-    app.route('/candidates')
-        .get( getCandidates)
-        .post( createCandidate);
+router.get('/', getCandidates); // Fetch all candidates
+router.get('/:id', getCandidate); // Fetch a specific candidate
+router.post('/', createCandidate); // Create a candidate
+router.put('/:id', updateCandidate); // Update a candidate
+router.delete('/:id', deleteCandidate); // Delete a candidate
 
-
-    app.route('/candidates/:id')
-       
-        .get( getCandidate)
-        .put( updateCandidate)
-        .delete( deleteCandidate);
-}
-
-
-export default CandidateUploadRoute;
+export default router;

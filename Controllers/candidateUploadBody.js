@@ -1,131 +1,104 @@
-import sql from 'mssql';
+import mysql from 'mysql2/promise';
 import config from '../model/config.js';
-//login first
-export const login = async (req, res) => {
-  const { username, password } = req.body;
 
-  // Check if required fields are provided
-  if (!username || !password) {
-    return res.status(400).json({ error: 'username and password are required' });
-  }
+// Create MySQL connection pool
+const pool = mysql.createPool(config.sql);
 
-  try {
-    const pool = await sql.connect(config.sql);
-
-    const result = await pool
-      .request()
-      .input('Username', sql.VarChar, username)
-      .input('password', sql.VarChar, password)
-      .query('SELECT * FROM users WHERE Username = @Username OR password=@password');
-
-    if (result.recordset.length === 0) {
-      return res.status(401).json({ error: 'Authentication failed. Wrong name or password' });
-    }
-
-    const user = result.recordset[0];
-
-    if (!bcrypt.compareSync(password, user.password)) {
-      return res.status(401).json({ error: 'Authorization failed. Wrong credentials' });
-    }
-
-    const token = jwt.sign(
-      { username: user.username, email: user.email, password: user.password },
-      config.jwt_secret,
-      { expiresIn: '1h' }
-    );
-
-    res.status(200).json({
-      message: 'Login successful',
-      email: user.email,
-      username: user.username,
-      password: user.password,
-      token: token
-    });
-  } catch (error) {
-    console.error('Error during login:', error);
-    console.log('error')
-    res.status(500).json({ error: 'Internal server error' });
-  } finally {
-    await sql.close();
-  }
-};
-
-// // Get all Candidates
+// ✅ Get all candidates
 export const getCandidates = async (req, res) => {
     try {
-        let pool = await sql.connect(config.sql);
-        const result = await pool.request().query("SELECT * from candidates");
-        !result.recordset[0] ? res.status(404).json({ message: 'candidates not found' }) :
-        // console.log(candidates)
-            res.status(200).json(result.recordset);
-    } catch (error)
-   
-    {
-       
-        res.status(201).json({ error: 'an error occurred while retrieving candidates' });
-    } finally {
-        sql.close(); // Close the SQL connection
+        const [rows] = await pool.query("SELECT * FROM candidates");
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'No candidates found' });
+        }
+
+        res.status(200).json(rows);
+    } catch (error) {
+        console.error("Database Error:", error);
+        res.status(500).json({ error: "Internal Server Error", details: error.message });
     }
 };
 
-// // Get a single candidate
+// ✅ Get a single candidate by ID
 export const getCandidate = async (req, res) => {
     try {
         const { id } = req.params;
-      
-        let pool = await sql.connect(config.sql);
-        const result = await pool.request()
-            .input("id", sql.Int, id)
-            .query("SELECT * FROM candidates WHERE id = @id");
-        !result.recordset[0] ? res.status(404).json({ message: 'candidte not found' }) :
-            res.status(200).json(result.recordset);
+        const [rows] = await pool.query("SELECT * FROM candidates WHERE id = ?", [id]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'Candidate not found' });
+        }
+
+        res.status(200).json(rows[0]);
     } catch (error) {
-        console.log (error)
-        res.status(500).json({ error: 'An error occurred while retrieving Candidate' });
-    } finally {
-        sql.close();
+        console.error("Error retrieving candidate:", error);
+        res.status(500).json({ error: 'An error occurred while retrieving the candidate', details: error.message });
     }
 };
 
-// // Create a new Candidate
+// ✅ Create a new candidate
 export const createCandidate = async (req, res) => {
     try {
-        const { position, full_name, party, img_url } = req.body;
-        await sql.connect(config.sql);
-        await sql.query`INSERT INTO candidates (position, full_name,vote_count, party, img_url) VALUES (${position}, ${full_name}, ${party}, ${img_url})`;
+        const { full_name, party, img_url, vote_count = 0, position } = req.body; // Set vote_count default to 0
+
+        if (!full_name || !party || !img_url || !position) {
+            return res.status(400).json({ error: "full_name, party, img_url, vote_count, and position are required" });
+        }
+
+        await pool.query(
+            "INSERT INTO candidates (full_name, party, img_url, vote_count, position) VALUES (?, ?, ?, ?, ?)", 
+            [full_name, party, img_url, vote_count, position]
+        );
+
         res.status(201).json({ message: 'Candidate created successfully' });
     } catch (error) {
-        res.status(500).json({ error: 'An error occurred while creating the Candidate' });
-    } finally {
-        sql.close();
+        console.error("Error creating candidate:", error);
+        res.status(500).json({ error: 'An error occurred while creating the candidate', details: error.message });
     }
 };
 
-// // Update a Candidate
+
+// ✅ Update a candidate
 export const updateCandidate = async (req, res) => {
     try {
         const { id } = req.params;
-        const { position, full_name, party, img_url } = req.body;
-        await sql.connect(config.sql);
-        await sql.query`UPDATE candidates SET position = ${position}, full_name = ${full_name}, party = ${party}, img_url = ${img_url} WHERE id = ${id}`;
+        const { full_name, party, position, img_url, vote_count } = req.body;
+
+        if (!full_name || !party || !position || !img_url || !vote_count) {
+            return res.status(400).json({ error: "full_name, Party, img_url, vote_count, and Position are required" });
+        }
+
+        const [result] = await pool.query(
+            "UPDATE candidates SET full_name = ?, party = ?, position = ?, img_url = ?, vote_count = ? WHERE id = ?",
+            [full_name, party, position, img_url, vote_count, id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Candidate not found' });
+        }
+
         res.status(200).json({ message: 'Candidate updated successfully' });
     } catch (error) {
-        res.status(500).json({ error: 'An error occurred while updating the Candidate' });
-    } finally {
-        sql.close();
+        console.error("Error updating candidate:", error);
+        res.status(500).json({ error: 'An error occurred while updating the candidate', details: error.message });
     }
 };
 
-// // Delete a candidate
+
+// ✅ Delete a candidate
 export const deleteCandidate = async (req, res) => {
     try {
         const { id } = req.params;
-        await sql.connect(config.sql);
-        await sql.query`DELETE FROM candidates WHERE id = ${id}`;
+        const [result] = await pool.query("DELETE FROM candidates WHERE id = ?", [id]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Candidate not found' });
+        }
+
         res.status(200).json({ message: 'Candidate deleted successfully' });
     } catch (error) {
-        res.status(500).json({ error: 'An error occurred while deleting the Candidate' });
-    } finally {
-        sql.close();
+        console.error("Error deleting candidate:", error);
+        res.status(500).json({ error: 'An error occurred while deleting the candidate', details: error.message });
     }
 };

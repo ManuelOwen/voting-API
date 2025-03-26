@@ -1,15 +1,14 @@
+import express from 'express';
 import { register, login } from '../Controllers/Authcontroller.js';
-// REGISTER NEW USER 
-const Authroutes = (app) => {
-  app.route('/Auth/register')
-    .post(register);
-    
 
-  app.route('/Auth/login')
-    .post(login); // Add the login controller method to handle the login route
+// REGISTER NEW USER
+const Authroutes = () => {
+  const router = express.Router();
 
-  // Don't forget to return app
-  return app;
+  router.post('/register', register);
+  router.post('/login', login);
+
+  return router;
 };
 
 export default Authroutes;
