@@ -1,12 +1,13 @@
 import express from 'express';
-import { getCandidates, getCandidate, createCandidate, updateCandidate, deleteCandidate } from '../controllers/candidateUploadBody.js';
+import { getCandidates, voteCandidate, getVotedCandidate, createCandidate, getCastedVotes } from '../controllers/candidateUploadBody.js';
 
 const router = express.Router();
 
-router.get('/', getCandidates); // Fetch all candidates
-router.get('/:id', getCandidate); // Fetch a specific candidate
-router.post('/', createCandidate); // Create a candidate
-router.put('/:id', updateCandidate); // Update a candidate
-router.delete('/:id', deleteCandidate); // Delete a candidate
+router.get('', getCandidates);
+router.post('/vote', voteCandidate);
+router.get('/voted', getVotedCandidate);
+router.post('/new', createCandidate);
+router.get('/votes', getCastedVotes); 
+
 
 export default router;

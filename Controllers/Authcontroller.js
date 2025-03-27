@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 
 
 
+//USED ON THE FRONT END
 export const register = async (req, res) => {
   const { username, password, email } = req.body;
   const saltRounds = 10;
@@ -32,11 +33,11 @@ export const register = async (req, res) => {
     if (existingUsers.length > 0) {
       return res.status(409).json({ error: 'User already exists' });
     }
-
+    const role = 'user';
     // Insert new user
     await pool.execute(
-      'INSERT INTO users (username,  email, password) VALUES ( ?, ?, ?)',
-      [username, email, hashedPassword]
+      'INSERT INTO users (username,  email, role, password) VALUES ( ?, ?, ?, ?)',
+      [username, email, role, hashedPassword]
     );
 
     res.status(201).json({ message: 'Registration successful' });
@@ -48,7 +49,7 @@ export const register = async (req, res) => {
 };
 
 
-// LOGIN USER
+//USED ON THE FRONT END
 export const login = async (req, res) => {
   const { email, password } = req.body;
 
@@ -89,19 +90,13 @@ export const login = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, username: user.username, email: user.email },
+      { id: user.id, username: user.username, email: user.email, role: user.role },
       config.jwt_secret,
-      { expiresIn: '1h' }
+      { expiresIn: '4h' }
     );
 
     res.status(200).json({
-      message: 'Login successful',
       token,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email
-      }
     });
 
   } catch (error) {

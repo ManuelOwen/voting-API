@@ -2,10 +2,8 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import config from './model/config.js';
 import cors from 'cors';
-import Userroutes from "./routes/Userroutes.js";
 import Authroutes from "./routes/Authroutes.js";
 import CandidateUploadRoute from './routes/CandidateRoute.js';
-import jwt from 'jsonwebtoken';
 import sql from 'mysql2';
 
 const app = express();
@@ -17,8 +15,9 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors());
 
+app.use("/uploads", express.static("uploads"));
+
 // Use imported routes
-app.use('/users', Userroutes);
 app.use('/auth', Authroutes);
 app.use('/candidates', CandidateUploadRoute);
 
