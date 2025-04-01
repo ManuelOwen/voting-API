@@ -155,4 +155,24 @@ export const getCastedVotes = async (req, res) => {
         res.status(500).json({ error: "Internal Server Error", details: error.message });
     }
 };
+// delete candidate by id and also delete votedetail
+export const deleteCandidate = async (req, res) => {
+    const candidateId = req.params.id;
+    try {
+        // Delete the candidate from the candidates table
+        const [result] = await pool.query("DELETE FROM candidates WHERE id = ?", [candidateId]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "Candidate not found" });
+        }
+
+        // Delete the candidate's votes from the vote_detail table
+        await pool.query("DELETE FROM vote_detail WHERE candidate_id = ?", [candidateId]);
+
+        res.status(200).json({ message: "Candidate deleted successfully" });
+    } catch (error) {
+        console.error("Error deleting candidate:", error);
+        res.status(500).json({ error: "Internal Server Error", details: error.message });
+    }
+};
+
 
